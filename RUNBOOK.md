@@ -18,7 +18,6 @@ Alex doesn't want to be involved, so only ask them when a step says **Ask Alex**
 | Discord Public Key (64 hex characters) | 4 | No, but keep it with the others |
 | Discord Bot Token | 4 | **Yes** |
 | Discord channel ID | 4 | No |
-| Alex's Discord user ID | 4 | No |
 
 ---
 
@@ -83,8 +82,7 @@ If the app passwords page says the setting isn't available, 2-Step Verification 
 5. In the Discord app, turn on **User Settings → Advanced → Developer Mode**.
 6. Find the channel where Formspree lead messages already appear. Right-click it → **Copy Channel ID**. That's the **Discord channel ID**.
    - If the channel is private, open **Edit Channel → Permissions** and add `Acme Leads` with View Channel, Send Messages, Embed Links and Read Message History.
-7. Right-click Alex's name in the member list → **Copy User ID**. That's **Alex's Discord user ID**. If other teammates should be able to press Send, copy theirs too.
-8. Optional: on **Installation**, set Install Link to **None**, then on **Bot**, turn **Public Bot** off. That stops anyone else adding the bot to their server.
+7. Optional: on **Installation**, set Install Link to **None**, then on **Bot**, turn **Public Bot** off. That stops anyone else adding the bot to their server.
 
 ## 5. Give the worker its settings
 
@@ -101,7 +99,7 @@ Fill in `secrets.json`:
 | `DISCORD_CHANNEL_ID` | Discord channel ID |
 | `GMAIL_USER` | Gmail address from step 3 |
 | `GMAIL_APP_PASSWORD` | Gmail app password from step 3 (spaces are fine) |
-| `ALLOWED_USER_IDS` | Alex's Discord user ID. Separate several with commas, no spaces. |
+| `ALLOWED_USER_IDS` | Leave empty (`""`). Anyone who can see the leads channel can then press the buttons, which is what Alex wants. |
 
 Then:
 
@@ -110,7 +108,7 @@ npx wrangler secret bulk secrets.json
 rm secrets.json
 ```
 
-✅ Expected: wrangler reports that 6 secrets were uploaded, and `git status` shows no `secrets.json`.
+✅ Expected: wrangler reports that the secrets were uploaded, and `git status` shows no `secrets.json`.
 
 ## 6. Discord: connect the buttons to the worker
 
@@ -164,7 +162,7 @@ Use email addresses you can read, and a different address for each test: each ad
 | No card in Discord after a test | `npx wrangler tail` while submitting the form shows the worker's logs. `Discord 403` = the bot can't see or post in the channel (step 4.6). `Discord 401` = wrong bot token (step 5). |
 | Card appears, but no email arrives | The card says "didn't send" with the reason. `535 Username and Password not accepted` = wrong `GMAIL_USER` or app password: make a new app password (step 3) and run `npx wrangler secret put GMAIL_APP_PASSWORD`. Also check spam. |
 | Nothing reaches the worker at all | In the browser's DevTools Network tab on example.com, look for a request to `.../lead`. Missing = the website deploy didn't pick up the variable (step 7). Status 403 = the page's address isn't in `ALLOWED_ORIGINS` in `wrangler.toml`. |
-| Pressing a button says "Only the Acme team can reply" | Add that person's Discord user ID to `ALLOWED_USER_IDS` and redo step 5 for that key (`npx wrangler secret put ALLOWED_USER_IDS`). |
+| Pressing a button says "Only the Acme team can reply" | `ALLOWED_USER_IDS` isn't empty. It should be: run `npx wrangler secret delete ALLOWED_USER_IDS`. |
 | "This interaction failed" in Discord | The Interactions Endpoint URL is wrong, or the worker is down. Open the Worker URL in a browser. |
 
 ## Later: sending from hello@example.com instead

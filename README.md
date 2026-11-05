@@ -31,7 +31,7 @@ Buttons are used instead of emoji reactions because reactions need a bot that st
 - Only the website's own domains can submit leads (`ALLOWED_ORIGINS`), and the form's honeypot field is honoured.
 - Each email address is handled once. Submitting again doesn't email them again.
 - At most `AUTO_SEND_DAILY_LIMIT` automatic emails a day (40). Past that, leads wait in Discord.
-- If `ALLOWED_USER_IDS` is set, only those Discord users can press the buttons.
+- Anyone who can see the Discord channel can press the buttons. To limit that to certain people, set `ALLOWED_USER_IDS` to their Discord user IDs, comma-separated.
 - A double click sends once.
 
 ## Changing things
