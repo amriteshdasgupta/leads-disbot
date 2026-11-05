@@ -7,6 +7,9 @@ import { getLead, leadId } from "../src/store";
 import type { Env, Lead } from "../src/types";
 import { leadRequest, schoolLead, setup, tutorLead } from "./helpers";
 
+const mailer = vi.hoisted(() => ({ send: vi.fn(async (..._args: unknown[]) => {}) }));
+vi.mock("worker-mailer", () => ({ WorkerMailer: { send: mailer.send } }));
+
 let keys: CryptoKeyPair;
 let publicKeyHex: string;
 
@@ -17,7 +20,10 @@ beforeAll(async () => {
   publicKeyHex = hex((await crypto.subtle.exportKey("raw", keys.publicKey)) as ArrayBuffer);
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  mailer.send.mockReset();
+});
 
 const run = (request: Request, env: Env, ctx: ExecutionContext) =>
   worker.fetch(request as Parameters<typeof worker.fetch>[0], env, ctx);
@@ -252,5 +258,54 @@ describe("POST /discord", () => {
     const res = await run(await discordRequest(click(`send:${id}`)), t.env, t.ctx);
     expect(((await res.json()) as any).data.flags).toBe(64);
     expect(t.resend()).toHaveLength(0);
+  });
+});
+
+describe("sending from Gmail", () => {
+  const gmail = { EMAIL_PROVIDER: "gmail" as const, GMAIL_USER: "owner@example.com", GMAIL_APP_PASSWORD: "abcd efgh ijkl mnop" };
+
+  it("auto-replies through Gmail's SMTP from the Gmail address", async () => {
+    const t = setup({ ...gmail, REPLY_TO: undefined });
+    await run(leadRequest(tutorLead), t.env, t.ctx);
+    await t.settle();
+
+    expect(t.resend()).toHaveLength(0);
+    expect(mailer.send).toHaveBeenCalledTimes(1);
+    const [server, email] = mailer.send.mock.calls[0] as [any, any];
+    expect(server).toMatchObject({ host: "smtp.gmail.com", port: 465, secure: true });
+    expect(server.credentials).toEqual({ username: "owner@example.com", password: "abcdefghijklmnop" });
+    expect(email.from).toEqual({ name: "Alex", email: "owner@example.com" });
+    expect(email.to).toEqual({ email: "sam.tutor@gmail.com" });
+    expect(email.reply).toBeUndefined();
+  });
+
+  it("a fast double click on Send emails once", async () => {
+    const t = setup({ ...gmail, DISCORD_PUBLIC_KEY: publicKeyHex });
+    await run(leadRequest(schoolLead), t.env, t.ctx);
+    await t.settle();
+    const id = await leadId(schoolLead.email);
+    let release = () => {};
+    mailer.send.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)));
+
+    await run(await discordRequest(click(`send:${id}`)), t.env, t.ctx);
+    const second = await run(await discordRequest(click(`send:${id}`)), t.env, t.ctx);
+    expect(((await second.json()) as any).data.content).toContain("already on its way");
+    release();
+    await t.settle();
+    expect(mailer.send).toHaveBeenCalledTimes(1);
+    expect((await getLead(t.env, id))?.status).toBe("sent");
+  });
+
+  it("says so on the card when the Gmail settings are missing", async () => {
+    const t = setup({ EMAIL_PROVIDER: "gmail", DISCORD_PUBLIC_KEY: publicKeyHex });
+    await run(leadRequest(schoolLead), t.env, t.ctx);
+    await t.settle();
+    const id = await leadId(schoolLead.email);
+    t.calls.length = 0;
+
+    await run(await discordRequest(click(`send:${id}`)), t.env, t.ctx);
+    await t.settle();
+    expect(mailer.send).not.toHaveBeenCalled();
+    expect(t.discord()[0].body.embeds[0].description).toContain("Gmail isn't set up");
   });
 });

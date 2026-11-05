@@ -30,6 +30,7 @@ export async function processLead(env: Env, lead: Lead, now = Date.now()): Promi
         lead.autoEmail = email;
         lead.handledAt = now;
       } catch (err) {
+        console.error(`[lead ${lead.id}] auto-reply failed:`, errorText(err));
         lead.status = "review";
         lead.note = `The auto-reply didn't send (${errorText(err)}), so this one is waiting for you.`;
       }

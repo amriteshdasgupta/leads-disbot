@@ -34,6 +34,18 @@ interface DiscordUser {
 
 const ephemeral = (content: string) => Response.json({ type: REPLY, data: { content, flags: 64 } });
 
+/** How long a Send blocks other Sends on the same lead. Gmail has no idempotency key. */
+const SEND_LOCK_MS = 2 * 60_000;
+
+/** Marks the lead as sending. Returns false if a Send is already in flight. */
+async function claimSend(env: Env, lead: Lead): Promise<boolean> {
+  const now = Date.now();
+  if (lead.sendingAt && now - lead.sendingAt < SEND_LOCK_MS) return false;
+  lead.sendingAt = now;
+  await saveLead(env, lead);
+  return true;
+}
+
 /** POST /discord: the Interactions Endpoint URL set in the Discord Developer Portal. */
 export async function handleInteraction(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const body = await verifyDiscordRequest(request, env.DISCORD_PUBLIC_KEY);
@@ -62,6 +74,7 @@ export async function handleInteraction(request: Request, env: Env, ctx: Executi
         return Response.json({ type: MODAL, data: composeModal(lead, lead.draft ?? personalDraft(lead, env.SENDER_NAME)) });
       case "send":
         if (!open || !lead.draft) return Response.json({ type: UPDATE, data: cardData(lead) });
+        if (!(await claimSend(env, lead))) return ephemeral("That email is already on its way.");
         ctx.waitUntil(sendAndUpdate(env, interaction, lead, lead.draft, who));
         return Response.json({ type: DEFERRED_UPDATE });
       case "skip":
@@ -81,6 +94,7 @@ export async function handleInteraction(request: Request, env: Env, ctx: Executi
     );
     const email: Email = { subject: values.subject?.trim() ?? "", body: values.body?.trim() ?? "" };
     if (!email.subject || !email.body) return ephemeral("The subject and message can't be empty.");
+    if (!(await claimSend(env, lead))) return ephemeral("That email is already on its way.");
     ctx.waitUntil(sendAndUpdate(env, interaction, lead, email, who));
     return Response.json({ type: DEFERRED_UPDATE });
   }
@@ -103,6 +117,7 @@ async function sendAndUpdate(env: Env, interaction: Interaction, lead: Lead, ema
     lead.draft = email;
     lead.note = (err instanceof Error ? err.message : String(err)).slice(0, 300);
   }
+  lead.sendingAt = undefined;
   await saveLead(env, lead);
   try {
     await updateOriginal(interaction.application_id, interaction.token, lead);

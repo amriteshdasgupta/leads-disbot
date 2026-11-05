@@ -22,7 +22,7 @@ Each lead card has buttons:
 | ✏️ **Write follow-up** | On auto-replied leads: write a personal email on top of the automatic one. |
 | 🔁 **Retry** | Shows if an email failed to send. |
 
-Emails come from `hello@example.com`. When a lead replies, it goes to the `REPLY_TO` inbox.
+Emails come from the Gmail in `GMAIL_USER` (Alex's), shown as `SENDER_NAME`. They appear in that Gmail's Sent folder, and replies come back to its inbox.
 
 Buttons are used instead of emoji reactions because reactions need a bot that stays connected to Discord all the time. Buttons work with nothing running in between.
 
@@ -40,7 +40,9 @@ Buttons are used instead of emoji reactions because reactions need a bot that st
 | --- | --- |
 | Email wording | `src/templates.ts` |
 | Who gets auto-replied vs. reviewed | `src/score.ts` |
-| Sender name, from address, daily limit | `[vars]` in `wrangler.toml` |
+| Sender name, daily limit | `[vars]` in `wrangler.toml` |
+| Which Gmail sends | `npx wrangler secret put GMAIL_USER`, then `GMAIL_APP_PASSWORD` |
+| Send from a example.com address instead | `EMAIL_PROVIDER = "resend"`. See the end of RUNBOOK.md |
 
 Then run `npm test` and `npm run deploy`.
 
@@ -52,7 +54,7 @@ See [RUNBOOK.md](RUNBOOK.md).
 
 ```sh
 npm ci
-npm test          # unit + end-to-end tests with mocked Discord and Resend
+npm test          # unit + end-to-end tests with mocked Discord, Gmail and Resend
 npm run typecheck
 npm run dev       # local worker on http://localhost:8787 (needs a .dev.vars file)
 ```

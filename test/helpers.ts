@@ -40,6 +40,7 @@ export function setup(overrides: Partial<Env> = {}) {
     DISCORD_BOT_TOKEN: "bot-token",
     DISCORD_PUBLIC_KEY: "",
     DISCORD_CHANNEL_ID: "chan1",
+    EMAIL_PROVIDER: "resend",
     RESEND_API_KEY: "re_test",
     REPLY_TO: "me@example.com",
     FROM_EMAIL: "Alex from Acme <hello@example.com>",

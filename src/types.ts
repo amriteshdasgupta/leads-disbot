@@ -5,11 +5,15 @@ export interface Env {
   DISCORD_BOT_TOKEN: string;
   DISCORD_PUBLIC_KEY: string;
   DISCORD_CHANNEL_ID: string;
-  RESEND_API_KEY: string;
+  GMAIL_USER?: string;
+  GMAIL_APP_PASSWORD?: string;
+  RESEND_API_KEY?: string;
   REPLY_TO?: string;
   ALLOWED_USER_IDS?: string;
 
   // Vars (wrangler.toml)
+  /** "gmail" sends from GMAIL_USER; "resend" sends from FROM_EMAIL. */
+  EMAIL_PROVIDER: "gmail" | "resend";
   FROM_EMAIL: string;
   SENDER_NAME: string;
   ALLOWED_ORIGINS: string;
@@ -64,6 +68,8 @@ export interface Lead {
   sentEmail?: Email;
   handledBy?: string;
   handledAt?: number;
+  /** Set while a Send is in flight, so a second click doesn't send twice. */
+  sendingAt?: number;
   note?: string;
   discordMessageId?: string;
 }
