@@ -22,7 +22,7 @@ Each lead card has buttons:
 | ✏️ **Write follow-up** | On auto-replied leads: write a personal email on top of the automatic one. |
 | 🔁 **Retry** | Shows if an email failed to send. |
 
-Emails come from the Gmail in `GMAIL_USER` (Alex's), shown as `SENDER_NAME`. They appear in that Gmail's Sent folder, and replies come back to its inbox.
+Emails come from the Gmail in `GMAIL_USER`. The pinned `SENDER_NAME` message in `#email-templates` sets the Gmail display name and the name used in new email drafts. They appear in that Gmail's Sent folder, and replies come back to its inbox.
 
 Buttons are used instead of emoji reactions because reactions need a bot that stays connected to Discord all the time. Buttons work with nothing running in between.
 
@@ -36,15 +36,34 @@ Buttons are used instead of emoji reactions because reactions need a bot that st
 
 ## Changing things
 
+### Edit emails in Discord — no deployment needed
+
+Open `#email-templates` and edit the three pinned messages you own (right-click → **Edit Message**):
+
+- `AUTO_REPLY`: the email small leads receive automatically.
+- `PERSONAL_DRAFT`: the draft for leads that wait for review in `#requests`.
+- `SENDER_NAME`: the name used in the signature and Gmail's From display name. Replace the name on its second line.
+
+Keep each message's first line, including the **@Acme Leads** mention, and keep `Subject: ` on the second line of the two email templates. Everything below the subject is the email body. Save the existing message rather than posting a second copy. The bot reads the pinned messages for each new lead; changes do not rewrite drafts that are already waiting for review. Discord's lead-card **Edit** button still edits just that lead's email.
+
+Common placeholders are `{{first_name}}`, `{{name}}`, `{{email}}`, `{{institution}}`, and `{{sender_name}}`. `{{greeting}}` becomes "Hi Sam," or "Hi there," when no name was supplied. The original personal draft also uses `{{institution_suffix}}` (" for Northgate"), `{{on_behalf_of}}` (" on behalf of Northgate"), `{{paper_owner}}` ("Northgate's" or "your"), and `{{note_acknowledgement}}` (the acknowledgement paragraph, only when the lead wrote a note). These optional phrases are empty when not needed. You can replace placeholders with your own wording.
+
+If a message is missing, duplicated, unreadable, or has an invalid placeholder, the worker uses its last valid saved version (or the original built-in default before one has been saved) and adds a warning to the lead card. Keep this channel to the three template pins and fewer than 50 pins in total.
+
+The channel is configured by `DISCORD_TEMPLATES_CHANNEL_ID`. The bot needs View Channel and Read Message History there. Its mention on each pinned message lets it read those messages [without enabling the privileged Message Content intent](https://docs.discord.com/developers/events/gateway#message-content-intent).
+
+### Other settings
+
 | To change | Edit |
 | --- | --- |
-| Email wording | `src/templates.ts` |
+| Email wording | Pinned messages in `#email-templates`; save the message, no deploy |
 | Who gets auto-replied vs. reviewed | `src/score.ts` |
-| Sender name, daily limit | `[vars]` in `wrangler.toml` |
+| Sender name | Pinned `SENDER_NAME` message in `#email-templates`; no deploy |
+| Daily limit, fallback sender name | `[vars]` in `wrangler.toml` |
 | Which Gmail sends | `npx wrangler secret put GMAIL_USER`, then `GMAIL_APP_PASSWORD` |
 | Send from a example.com address instead | `EMAIL_PROVIDER = "resend"`. See the end of RUNBOOK.md |
 
-Then run `npm test` and `npm run deploy`.
+For code or `wrangler.toml` changes, run `npm test`, `npm run typecheck`, and `npm run deploy`. The built-in fallback wording remains in `src/templates.ts`.
 
 ## Setup
 

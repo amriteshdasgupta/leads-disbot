@@ -16,6 +16,7 @@ export interface Env {
   EMAIL_PROVIDER: "gmail" | "resend";
   FROM_EMAIL: string;
   SENDER_NAME: string;
+  DISCORD_TEMPLATES_CHANNEL_ID?: string;
   ALLOWED_ORIGINS: string;
   AUTO_SEND_DAILY_LIMIT: string;
 }
@@ -23,6 +24,7 @@ export interface Env {
 export interface Email {
   subject: string;
   body: string;
+  senderName?: string;
 }
 
 export type LeadStatus = "pending" | "review" | "auto_sent" | "sent" | "skipped" | "failed";

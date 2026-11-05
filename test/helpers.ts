@@ -51,6 +51,8 @@ export function setup(overrides: Partial<Env> = {}) {
   } as Env;
 
   const calls: Call[] = [];
+  const templateMessages = new Map<string, { id: string; channel_id: string; content: string }>();
+  let templateError = 0;
   let failResend = false;
   vi.stubGlobal(
     "fetch",
@@ -63,6 +65,12 @@ export function setup(overrides: Partial<Env> = {}) {
       });
       if (url.includes("resend.com")) {
         return failResend ? new Response("boom", { status: 500 }) : Response.json({ id: "email_1" });
+      }
+      if ((init.method ?? "GET") === "GET" && url.includes("discord.com")) {
+        if (templateError) return new Response("unavailable", { status: templateError });
+        if (url.endsWith("/messages/pins?limit=50")) return Response.json({ items: [...templateMessages.values()].map(message => ({ message })), has_more: false });
+        const message = templateMessages.get(url.split("/").pop()!);
+        return message ? Response.json(message) : new Response("not found", { status: 404 });
       }
       return Response.json({ id: "msg_1" });
     }),
@@ -81,6 +89,10 @@ export function setup(overrides: Partial<Env> = {}) {
     calls,
     resend: () => calls.filter((c) => c.url.includes("resend.com")),
     discord: () => calls.filter((c) => c.url.includes("discord.com")),
+    template: (id: string, content: string, channel = "templates") => {
+      templateMessages.set(id, { id, channel_id: channel, content });
+    },
+    failTemplates: (status = 503) => { templateError = status; },
     failResend: (fail = true) => {
       failResend = fail;
     },

@@ -42,7 +42,7 @@ async function sendWithGmail(env: Env, to: string, email: Email): Promise<void> 
       authType: "plain",
     },
     {
-      from: { name: env.SENDER_NAME, email: env.GMAIL_USER },
+      from: { name: email.senderName ?? env.SENDER_NAME, email: env.GMAIL_USER },
       to: { email: to },
       ...(env.REPLY_TO ? { reply: env.REPLY_TO } : {}),
       subject: email.subject,

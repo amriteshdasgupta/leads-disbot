@@ -1,7 +1,7 @@
 import { composeModal, leadCard as cardData, updateOriginal, verifyDiscordRequest } from "./discord";
 import { sendEmail } from "./email";
 import { getLead, saveLead, sha256Hex } from "./store";
-import { personalDraft } from "./templates";
+import { emailDrafts } from "./discord-templates";
 import type { Email, Env, Lead } from "./types";
 
 // https://discord.com/developers/docs/interactions/receiving-and-responding
@@ -71,7 +71,11 @@ export async function handleInteraction(request: Request, env: Env, ctx: Executi
     switch (action) {
       case "edit":
         if (!canWrite) return Response.json({ type: UPDATE, data: cardData(lead) });
-        return Response.json({ type: MODAL, data: composeModal(lead, lead.draft ?? personalDraft(lead, env.SENDER_NAME)) });
+        if (!lead.draft) {
+          lead.draft = (await emailDrafts(env, lead)).personal;
+          await saveLead(env, lead);
+        }
+        return Response.json({ type: MODAL, data: composeModal(lead, lead.draft) });
       case "send":
         if (!open || !lead.draft) return Response.json({ type: UPDATE, data: cardData(lead) });
         if (!(await claimSend(env, lead))) return ephemeral("That email is already on its way.");
@@ -92,7 +96,10 @@ export async function handleInteraction(request: Request, env: Env, ctx: Executi
     const values = Object.fromEntries(
       (interaction.data?.components ?? []).flatMap((row) => row.components.map((c) => [c.custom_id, c.value])),
     );
-    const email: Email = { subject: values.subject?.trim() ?? "", body: values.body?.trim() ?? "" };
+    const email: Email = {
+      subject: values.subject?.trim() ?? "", body: values.body?.trim() ?? "",
+      senderName: lead.draft?.senderName,
+    };
     if (!email.subject || !email.body) return ephemeral("The subject and message can't be empty.");
     if (!(await claimSend(env, lead))) return ephemeral("That email is already on its way.");
     ctx.waitUntil(sendAndUpdate(env, interaction, lead, email, who));

@@ -19,6 +19,7 @@ id = "REPLACE_WITH_KV_ID" # npm run setup fills this in
 #   "resend": from FROM_EMAIL, through Resend (needs RESEND_API_KEY and a verified domain).
 EMAIL_PROVIDER = "gmail"
 SENDER_NAME = "Alex"
+DISCORD_TEMPLATES_CHANNEL_ID = "REPLACE_WITH_TEMPLATES_CHANNEL_ID"
 FROM_EMAIL = "Alex from Acme <hello@example.com>"
 ALLOWED_ORIGINS = "https://example.com,https://www.example.com,https://example.org,https://www.example.org"
 AUTO_SEND_DAILY_LIMIT = "40"

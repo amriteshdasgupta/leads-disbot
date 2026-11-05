@@ -264,6 +264,24 @@ describe("POST /discord", () => {
 describe("sending from Gmail", () => {
   const gmail = { EMAIL_PROVIDER: "gmail" as const, GMAIL_USER: "owner@example.com", GMAIL_APP_PASSWORD: "abcd efgh ijkl mnop" };
 
+  it("keeps the Discord sender name when a review email is edited and sent", async () => {
+    const t = setup({ ...gmail, DISCORD_PUBLIC_KEY: publicKeyHex, DISCORD_TEMPLATES_CHANNEL_ID: "templates" });
+    t.template("sender", "SENDER_NAME <@123>\nAmritesh");
+    await run(leadRequest(schoolLead), t.env, t.ctx);
+    await t.settle();
+    const id = await leadId(schoolLead.email);
+    await run(await discordRequest(click(`compose:${id}`, {
+      type: 5,
+      data: { custom_id: `compose:${id}`, components: [
+        { components: [{ custom_id: "subject", value: "Edited demo" }] },
+        { components: [{ custom_id: "body", value: "Hello Priya,\nAmritesh" }] },
+      ] },
+    })), t.env, t.ctx);
+    await t.settle();
+    const [, email] = mailer.send.mock.calls[0] as [any, any];
+    expect(email.from).toEqual({ name: "Amritesh", email: "owner@example.com" });
+  });
+
   it("auto-replies through Gmail's SMTP from the Gmail address", async () => {
     const t = setup({ ...gmail, REPLY_TO: undefined });
     await run(leadRequest(tutorLead), t.env, t.ctx);

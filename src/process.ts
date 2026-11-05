@@ -2,7 +2,7 @@ import { postCard } from "./discord";
 import { sendEmail } from "./email";
 import { scoreLead } from "./score";
 import { getLead, listDueLeadIds, saveLead, takeAutoSendSlot } from "./store";
-import { autoReply, personalDraft } from "./templates";
+import { emailDrafts } from "./discord-templates";
 import type { Env, Lead } from "./types";
 
 const MAX_ATTEMPTS = 5;
@@ -19,11 +19,13 @@ export async function processLead(env: Env, lead: Lead, now = Date.now()): Promi
   const { score, reasons, review } = scoreLead(lead);
   lead.score = score;
   lead.reasons = reasons;
-  lead.draft ??= personalDraft(lead, env.SENDER_NAME);
+  const drafts = await emailDrafts(env, lead);
+  lead.draft ??= drafts.personal;
+  if (drafts.warnings.length) lead.note = `Check #email-templates. ${drafts.warnings.join(" ")}`;
 
   if (lead.status === "pending") {
     if (!review && (await takeAutoSendSlot(env, now))) {
-      const email = autoReply(lead, env.SENDER_NAME);
+      const email = drafts.automatic;
       try {
         await sendEmail(env, lead.email, email, `${lead.id}-auto`);
         lead.status = "auto_sent";
