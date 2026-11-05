@@ -1,0 +1,21 @@
+name = "lead-responder"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Picks up leads who never finished the form, and retries anything that failed.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[kv_namespaces]]
+binding = "LEADS"
+id = "REPLACE_WITH_KV_ID" # npm run setup fills this in
+
+[vars]
+FROM_EMAIL = "Alex from Acme <hello@example.com>"
+SENDER_NAME = "Alex"
+ALLOWED_ORIGINS = "https://example.com,https://www.example.com,https://example.org,https://www.example.org"
+AUTO_SEND_DAILY_LIMIT = "40"
+
+[observability]
+enabled = true
