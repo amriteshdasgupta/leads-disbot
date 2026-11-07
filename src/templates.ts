@@ -55,6 +55,8 @@ export const DEFAULT_TEMPLATES: Record<"AUTO_REPLY" | "PERSONAL_DRAFT", Email> =
 export function renderEmailTemplate(template: Email, lead: Lead, senderName: string, productName: string): Email {
   const first = firstName(lead);
   const org = lead.institution || "";
+  // "Northgate Logistics'" rather than "Northgate Logistics's".
+  const possessive = org ? (/s$/i.test(org) ? `${org}'` : `${org}'s`) : "your";
   const values: Record<string, string> = {
     first_name: first || "there",
     name: lead.name || "there",
@@ -64,8 +66,8 @@ export function renderEmailTemplate(template: Email, lead: Lead, senderName: str
     product_name: productName,
     greeting: first ? `Hi ${first},` : "Hi there,",
     on_behalf_of: org ? ` on behalf of ${org}` : "",
-    org_possessive: org ? `${org}'s` : "your",
-    paper_owner: org ? `${org}'s` : "your",
+    org_possessive: possessive,
+    paper_owner: possessive,
     institution_suffix: org ? ` for ${org}` : "",
     note_acknowledgement: lead.message ? "\n\nThanks for the note as well. I'll make sure we cover it." : "",
   };

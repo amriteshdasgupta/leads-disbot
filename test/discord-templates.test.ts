@@ -31,7 +31,7 @@ describe("built-in email templates", () => {
     const drafts = await emailDrafts(t.config, lead());
     expect(drafts.automatic).toEqual(renderEmailTemplate(DEFAULT_TEMPLATES.AUTO_REPLY, lead(), "Jordan", "Example Co"));
     expect(drafts.personal.subject).toBe("Getting started with Example Co for Northgate Logistics");
-    expect(drafts.personal.body).toContain("how Example Co could work for Northgate Logistics's team.");
+    expect(drafts.personal.body).toContain("how Example Co could work for Northgate Logistics' team.");
     expect(drafts.personal.body).toMatch(/Thanks for the note as well\. .*\n\nCould you/);
     expect(drafts.personal.body).toMatch(/\nJordan\nExample Co$/);
     expect(drafts.personal.senderName).toBe("Jordan");
@@ -59,7 +59,7 @@ describe("Discord email templates", () => {
     expect(drafts.personal.subject).toBe("Example Co for Northgate Logistics");
     expect(drafts.personal.body).toContain("Hi Priya,");
     expect(drafts.personal.body).toContain("on behalf of Northgate Logistics");
-    expect(drafts.personal.body).toContain("Northgate Logistics's account");
+    expect(drafts.personal.body).toContain("Northgate Logistics' account");
     expect(drafts.personal.body).toContain("Thanks for the note as well.");
     expect(drafts.automatic.senderName).toBe("Casey");
     expect(drafts.warnings).toEqual([]);
@@ -67,10 +67,16 @@ describe("Discord email templates", () => {
     expect(t.discord().every(c => c.headers.Authorization === "Bot bot-token")).toBe(true);
   });
 
+  it("writes the possessive without a doubled s", () => {
+    const template = parseEmailTemplate(personal, "PERSONAL_DRAFT");
+    const draft = renderEmailTemplate(template, lead({ institution: "Studio Nine" }), "Team", "Example Co");
+    expect(draft.body).toContain("Let's set up Studio Nine's account.");
+  });
+
   it("still accepts the deprecated paper_owner placeholder", () => {
     const old = personal.replace("{{org_possessive}}", "{{paper_owner}}");
     const draft = renderEmailTemplate(parseEmailTemplate(old, "PERSONAL_DRAFT"), lead(), "Team", "Example Co");
-    expect(draft.body).toContain("Let's set up Northgate Logistics's account.");
+    expect(draft.body).toContain("Let's set up Northgate Logistics' account.");
     const withoutOrg = renderEmailTemplate(parseEmailTemplate(old, "PERSONAL_DRAFT"), lead({ institution: undefined }), "Team", "Example Co");
     expect(withoutOrg.body).toContain("Let's set up your account.");
   });
