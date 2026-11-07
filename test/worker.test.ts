@@ -62,11 +62,80 @@ describe("parseSubmission", () => {
   });
 });
 
+describe("HTTP", () => {
+  it("answers the health check", async () => {
+    const t = setup();
+    const res = await run(new Request("https://leads.example/"), t.env, t.ctx);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("lead-responder is running\n");
+    expect((await run(new Request("https://leads.example/nope"), t.env, t.ctx)).status).toBe(404);
+  });
+
+  it("says it's misconfigured, without the details, when the config is invalid", async () => {
+    const t = setup({ PRODUCT_NAME: "" });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await run(leadRequest(companyLead), t.env, t.ctx);
+    expect(res.status).toBe(500);
+    expect(await res.text()).toContain("misconfigured");
+    expect(String(error.mock.calls[0][0])).toContain("PRODUCT_NAME is missing");
+    error.mockRestore();
+  });
+});
+
 describe("POST /lead", () => {
+  const preflight = (origin: string) =>
+    new Request("https://leads.example/lead", {
+      method: "OPTIONS",
+      headers: { Origin: origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type" },
+    });
+
   it("rejects other websites", async () => {
     const t = setup();
     const res = await run(leadRequest(companyLead, "https://evil.example"), t.env, t.ctx);
     expect(res.status).toBe(403);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    expect((await run(preflight("https://evil.example"), t.env, t.ctx)).status).toBe(403);
+    expect(t.kv.data.size).toBe(0);
+  });
+
+  it("answers the browser's preflight for allowed websites", async () => {
+    const t = setup();
+    const res = await run(preflight("https://example.org"), t.env, t.ctx);
+    expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://example.org");
+    expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST,OPTIONS");
+    expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+    expect(res.headers.get("Access-Control-Max-Age")).toBe("86400");
+    expect(res.headers.get("Vary")).toContain("Origin");
+  });
+
+  it("only accepts POST", async () => {
+    const t = setup();
+    const res = await run(new Request("https://leads.example/lead", { headers: { Origin: "https://example.com" } }), t.env, t.ctx);
+    expect(res.status).toBe(405);
+  });
+
+  it("refuses bodies over 16 KB and bad JSON, with CORS headers so the page can read why", async () => {
+    const t = setup();
+    const big = await run(leadRequest({ ...companyLead, message: "x".repeat(17_000) }), t.env, t.ctx);
+    expect(big.status).toBe(413);
+    expect(big.headers.get("Access-Control-Allow-Origin")).toBe("https://example.com");
+    const bad = await run(new Request("https://leads.example/lead", { method: "POST", headers: { Origin: "https://example.com" }, body: "{oops" }), t.env, t.ctx);
+    expect(bad.status).toBe(400);
+    expect(bad.headers.get("Access-Control-Allow-Origin")).toBe("https://example.com");
+    expect(t.kv.data.size).toBe(0);
+  });
+
+  it("silently accepts honeypot hits and invalid emails without storing them", async () => {
+    const t = setup();
+    for (const body of [{ ...companyLead, _gotcha: "bot" }, { ...companyLead, email: "nope" }, ["not", "an", "object"]]) {
+      const res = await run(leadRequest(body), t.env, t.ctx);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    }
+    await t.settle();
+    expect(t.kv.data.size).toBe(0);
+    expect(t.calls).toHaveLength(0);
   });
 
   it("puts a strong lead in Discord with a draft and buttons, without emailing", async () => {

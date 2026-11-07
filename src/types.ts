@@ -1,3 +1,5 @@
+import type { Config } from "./config";
+
 /**
  * The worker's bindings as Cloudflare passes them: vars from wrangler.toml and
  * secrets from `wrangler secret`. Read them through loadConfig() (config.ts),
@@ -27,6 +29,12 @@ export interface Env {
   RESEND_API_KEY?: string;
   REPLY_TO?: string;
   ALLOWED_USER_IDS?: string;
+}
+
+/** Hono's view of the worker: the raw bindings, plus the config loaded for each request. */
+export interface AppEnv {
+  Bindings: Env;
+  Variables: { config: Config };
 }
 
 export interface Email {

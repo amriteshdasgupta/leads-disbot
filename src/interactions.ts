@@ -1,9 +1,10 @@
+import type { Context } from "hono";
+import type { Config } from "./config";
 import { composeModal, leadCard as cardData, updateOriginal, verifyDiscordRequest } from "./discord";
+import { emailDrafts } from "./discord-templates";
 import { sendEmail } from "./email";
 import { getLead, saveLead, sha256Hex } from "./store";
-import { emailDrafts } from "./discord-templates";
-import type { Config } from "./config";
-import type { Email, Lead } from "./types";
+import type { AppEnv, Email, Lead } from "./types";
 
 // https://discord.com/developers/docs/interactions/receiving-and-responding
 const PING = 1;
@@ -33,7 +34,8 @@ interface DiscordUser {
   global_name?: string | null;
 }
 
-const ephemeral = (content: string) => Response.json({ type: REPLY, data: { content, flags: 64 } });
+/** A reply only the person who pressed the button sees. */
+const ephemeral = (c: Context<AppEnv>, content: string) => c.json({ type: REPLY, data: { content, flags: 64 } });
 
 /** How long a Send blocks other Sends on the same lead. Gmail has no idempotency key. */
 const SEND_LOCK_MS = 2 * 60_000;
@@ -48,22 +50,23 @@ async function claimSend(config: Config, lead: Lead): Promise<boolean> {
 }
 
 /** POST /discord: the Interactions Endpoint URL set in the Discord Developer Portal. */
-export async function handleInteraction(request: Request, config: Config, ctx: ExecutionContext): Promise<Response> {
-  const body = await verifyDiscordRequest(request, config.DISCORD_PUBLIC_KEY);
-  if (body === null) return new Response("Bad signature", { status: 401 });
+export async function handleInteraction(c: Context<AppEnv>): Promise<Response> {
+  const config = c.get("config");
+  const body = await verifyDiscordRequest(c.req.raw, config.DISCORD_PUBLIC_KEY);
+  if (body === null) return c.text("Bad signature", 401);
   const interaction = JSON.parse(body) as Interaction;
-  if (interaction.type === PING) return Response.json({ type: PONG });
+  if (interaction.type === PING) return c.json({ type: PONG });
 
   const user = interaction.member?.user ?? interaction.user;
   const allowed = config.ALLOWED_USER_IDS;
   if (allowed.length && (!user || !allowed.includes(user.id))) {
-    return ephemeral("Only allowed team members can reply to leads.");
+    return ephemeral(c, "Only allowed team members can reply to leads.");
   }
   const who = user?.global_name || user?.username || "someone";
 
   const [action, id] = (interaction.data?.custom_id ?? "").split(":");
   const lead = id ? await getLead(config, id) : null;
-  if (!lead) return ephemeral("This lead has expired, so it can't be emailed from here any more.");
+  if (!lead) return ephemeral(c, "This lead has expired, so it can't be emailed from here any more.");
 
   const open = lead.status === "review" || lead.status === "failed" || lead.status === "pending";
   const canWrite = open || lead.status === "auto_sent";
@@ -71,29 +74,29 @@ export async function handleInteraction(request: Request, config: Config, ctx: E
   if (interaction.type === COMPONENT) {
     switch (action) {
       case "edit":
-        if (!canWrite) return Response.json({ type: UPDATE, data: cardData(config, lead) });
+        if (!canWrite) return c.json({ type: UPDATE, data: cardData(config, lead) });
         if (!lead.draft) {
           lead.draft = (await emailDrafts(config, lead)).personal;
           await saveLead(config, lead);
         }
-        return Response.json({ type: MODAL, data: composeModal(lead, lead.draft) });
+        return c.json({ type: MODAL, data: composeModal(lead, lead.draft) });
       case "send":
-        if (!open || !lead.draft) return Response.json({ type: UPDATE, data: cardData(config, lead) });
-        if (!(await claimSend(config, lead))) return ephemeral("That email is already on its way.");
-        ctx.waitUntil(sendAndUpdate(config, interaction, lead, lead.draft, who));
-        return Response.json({ type: DEFERRED_UPDATE });
+        if (!open || !lead.draft) return c.json({ type: UPDATE, data: cardData(config, lead) });
+        if (!(await claimSend(config, lead))) return ephemeral(c, "That email is already on its way.");
+        c.executionCtx.waitUntil(sendAndUpdate(config, interaction, lead, lead.draft, who));
+        return c.json({ type: DEFERRED_UPDATE });
       case "skip":
-        if (!open) return Response.json({ type: UPDATE, data: cardData(config, lead) });
+        if (!open) return c.json({ type: UPDATE, data: cardData(config, lead) });
         lead.status = "skipped";
         lead.handledBy = who;
         lead.handledAt = Date.now();
         await saveLead(config, lead);
-        return Response.json({ type: UPDATE, data: cardData(config, lead) });
+        return c.json({ type: UPDATE, data: cardData(config, lead) });
     }
   }
 
   if (interaction.type === MODAL_SUBMIT && action === "compose") {
-    if (!canWrite) return ephemeral("This lead has already been handled.");
+    if (!canWrite) return ephemeral(c, "This lead has already been handled.");
     const values = Object.fromEntries(
       (interaction.data?.components ?? []).flatMap((row) => row.components.map((c) => [c.custom_id, c.value])),
     );
@@ -101,13 +104,13 @@ export async function handleInteraction(request: Request, config: Config, ctx: E
       subject: values.subject?.trim() ?? "", body: values.body?.trim() ?? "",
       senderName: lead.draft?.senderName,
     };
-    if (!email.subject || !email.body) return ephemeral("The subject and message can't be empty.");
-    if (!(await claimSend(config, lead))) return ephemeral("That email is already on its way.");
-    ctx.waitUntil(sendAndUpdate(config, interaction, lead, email, who));
-    return Response.json({ type: DEFERRED_UPDATE });
+    if (!email.subject || !email.body) return ephemeral(c, "The subject and message can't be empty.");
+    if (!(await claimSend(config, lead))) return ephemeral(c, "That email is already on its way.");
+    c.executionCtx.waitUntil(sendAndUpdate(config, interaction, lead, email, who));
+    return c.json({ type: DEFERRED_UPDATE });
   }
 
-  return ephemeral("That button isn't recognised.");
+  return ephemeral(c, "That button isn't recognised.");
 }
 
 async function sendAndUpdate(config: Config, interaction: Interaction, lead: Lead, email: Email, who: string): Promise<void> {
