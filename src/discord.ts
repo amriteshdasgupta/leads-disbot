@@ -1,5 +1,6 @@
 import { typeLabel } from "./score";
-import type { Email, Env, Lead } from "./types";
+import type { Config } from "./config";
+import type { Email, Lead } from "./types";
 
 const API = "https://discord.com/api/v10";
 
@@ -66,7 +67,7 @@ function buttons(lead: Lead) {
   }
 }
 
-export function leadCard(lead: Lead) {
+export function leadCard(config: Config, lead: Lead) {
   const { label, email } = shownEmail(lead);
   const description = [
     statusLine(lead),
@@ -77,7 +78,7 @@ export function leadCard(lead: Lead) {
     .join("\n");
 
   const fields = [
-    { name: "Type", value: typeLabel(lead.organizationType), inline: true },
+    { name: "Type", value: typeLabel(lead.organizationType, config), inline: true },
     { name: "Email", value: lead.email, inline: true },
     { name: "Phone", value: lead.phone || "–", inline: true },
   ];
@@ -105,14 +106,14 @@ export function leadCard(lead: Lead) {
 }
 
 /** Posts the lead's card, or updates it if it's already in the channel. Returns the message id. */
-export async function postCard(env: Env, lead: Lead): Promise<string> {
+export async function postCard(config: Config, lead: Lead): Promise<string> {
   const existing = lead.discordMessageId;
   const response = await fetch(
-    `${API}/channels/${env.DISCORD_CHANNEL_ID}/messages${existing ? `/${existing}` : ""}`,
+    `${API}/channels/${config.DISCORD_CHANNEL_ID}/messages${existing ? `/${existing}` : ""}`,
     {
       method: existing ? "PATCH" : "POST",
-      headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify(leadCard(lead)),
+      headers: { Authorization: `Bot ${config.DISCORD_BOT_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify(leadCard(config, lead)),
     },
   );
   if (!response.ok) throw new Error(`Discord ${response.status}: ${(await response.text()).slice(0, 200)}`);
@@ -120,11 +121,11 @@ export async function postCard(env: Env, lead: Lead): Promise<string> {
 }
 
 /** Replaces the card the button was pressed on, after a deferred response. */
-export async function updateOriginal(applicationId: string, token: string, lead: Lead): Promise<void> {
+export async function updateOriginal(config: Config, applicationId: string, token: string, lead: Lead): Promise<void> {
   const response = await fetch(`${API}/webhooks/${applicationId}/${token}/messages/@original`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(leadCard(lead)),
+    body: JSON.stringify(leadCard(config, lead)),
   });
   if (!response.ok) throw new Error(`Discord ${response.status}: ${(await response.text()).slice(0, 200)}`);
 }
@@ -148,7 +149,7 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 /** Checks Discord's Ed25519 signature. Returns the raw body if it's genuine, otherwise null. */
-export async function verifyDiscordRequest(request: Request, publicKey: string): Promise<string | null> {
+export async function verifyDiscordRequest(request: Request, publicKey = ""): Promise<string | null> {
   const signature = request.headers.get("X-Signature-Ed25519");
   const timestamp = request.headers.get("X-Signature-Timestamp");
   const body = await request.text();

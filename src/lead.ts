@@ -1,41 +1,54 @@
+import { z } from "zod";
 import type { Lead, Submission } from "./types";
 
-/** Finished details dialog: process right away (the delay is only a retry fallback). */
+/** Finished form: process right away (the delay is only a retry fallback). */
 export const COMPLETE_RETRY_MS = 5 * 60_000;
-/** Email-only or half-filled: wait in case the person finishes the details dialog. */
+/** Email-only or half-filled: wait in case the person finishes the form. */
 export const INCOMPLETE_WAIT_MS = 15 * 60_000;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const FIELDS = ["name", "institution", "organizationType", "phone", "message"] as const;
 
-function str(value: unknown, max: number): string {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
+// Lenient on purpose: a field that's missing or the wrong type becomes "",
+// so one odd field never loses the whole lead.
+const text = (max: number) => z.string().catch("").transform((value) => value.trim().slice(0, max));
+const flag = z.boolean().catch(false);
+
+const Payload = z.object({
+  _gotcha: text(200),
+  email: text(254).transform((value) => value.toLowerCase()),
+  capturedEmail: text(254).transform((value) => value.toLowerCase()),
+  name: text(200),
+  institution: text(200),
+  organizationType: text(200),
+  phone: text(200),
+  message: text(2000),
+  sourceForm: text(100),
+  sourceUrl: text(200),
+  partial: flag,
+  emailCapture: flag,
+});
 
 /**
- * Turns a website payload (lib/leads.ts in your-website) into a Submission.
- * Returns null for anything that isn't a usable lead, including honeypot hits.
+ * Turns a website form payload into a Submission. Returns null for anything
+ * that isn't a usable lead, including honeypot hits.
  */
 export function parseSubmission(body: unknown): Submission | null {
-  if (!body || typeof body !== "object") return null;
-  const b = body as Record<string, unknown>;
-  if (str(b._gotcha, 200)) return null;
-
-  const email = str(b.email, 254).toLowerCase();
-  if (!EMAIL_RE.test(email)) return null;
+  const parsed = Payload.safeParse(body);
+  if (!parsed.success) return null;
+  const b = parsed.data;
+  if (b._gotcha || !EMAIL_RE.test(b.email)) return null;
 
   const sub: Submission = {
-    email,
-    sourceForm: str(b.sourceForm, 100) || undefined,
-    sourceUrl: str(b.sourceUrl, 200) || undefined,
-    complete: b.partial !== true && b.emailCapture !== true && str(b.name, 200).length >= 2,
+    email: b.email,
+    sourceForm: b.sourceForm || undefined,
+    sourceUrl: b.sourceUrl || undefined,
+    complete: !b.partial && !b.emailCapture && b.name.length >= 2,
   };
   for (const field of FIELDS) {
-    const value = str(b[field], field === "message" ? 2000 : 200);
-    if (value) sub[field] = value;
+    if (b[field]) sub[field] = b[field];
   }
-  const captured = str(b.capturedEmail, 254).toLowerCase();
-  if (EMAIL_RE.test(captured) && captured !== email) sub.capturedEmail = captured;
+  if (EMAIL_RE.test(b.capturedEmail) && b.capturedEmail !== b.email) sub.capturedEmail = b.capturedEmail;
   return sub;
 }
 

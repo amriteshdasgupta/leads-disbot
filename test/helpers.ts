@@ -1,5 +1,8 @@
 import { vi } from "vitest";
+import { loadConfig } from "../src/config";
 import type { Env } from "../src/types";
+
+export const TEMPLATES_CHANNEL = "100000000000000001";
 
 class MemoryKV {
   data = new Map<string, { value: string; metadata?: unknown }>();
@@ -43,8 +46,9 @@ export function setup(overrides: Partial<Env> = {}) {
     EMAIL_PROVIDER: "resend",
     RESEND_API_KEY: "re_test",
     REPLY_TO: "me@example.com",
-    FROM_EMAIL: "Alex from Acme <hello@example.com>",
-    SENDER_NAME: "Alex",
+    FROM_EMAIL: "Jordan from Example Co <hello@example.com>",
+    PRODUCT_NAME: "Example Co",
+    SENDER_NAME: "Jordan",
     ALLOWED_ORIGINS: "https://example.com,https://example.org",
     AUTO_SEND_DAILY_LIMIT: "40",
     ...overrides,
@@ -84,12 +88,16 @@ export function setup(overrides: Partial<Env> = {}) {
 
   return {
     env,
+    /** Read fresh each time, so tests can change env between steps. */
+    get config() {
+      return loadConfig(env);
+    },
     kv,
     ctx,
     calls,
     resend: () => calls.filter((c) => c.url.includes("resend.com")),
     discord: () => calls.filter((c) => c.url.includes("discord.com")),
-    template: (id: string, content: string, channel = "templates") => {
+    template: (id: string, content: string, channel = TEMPLATES_CHANNEL) => {
       templateMessages.set(id, { id, channel_id: channel, content });
     },
     failTemplates: (status = 503) => { templateError = status; },
@@ -110,26 +118,26 @@ export function leadRequest(body: unknown, origin = "https://example.com") {
   });
 }
 
-export const schoolLead = {
-  organizationType: "School",
+/** Scores high enough for review: a named company, work email, phone and a message. */
+export const companyLead = {
+  organizationType: "Company",
   name: "Priya Sharma",
-  institution: "Northgate High School",
-  email: "priya@northgate.edu.au",
+  institution: "Northgate Logistics",
+  email: "priya@northgate.example",
   phone: "+61 400 000 000",
-  message: "We'd like to try this for our Year 10 science exams.",
-  demoRequest: true,
-  sourceForm: "hero_details",
+  message: "We'd like to try this with our support team next quarter.",
+  sourceForm: "contact_form",
   sourceUrl: "https://example.com",
 };
 
-export const tutorLead = {
+/** Scores low, so it gets the automatic reply. */
+export const individualLead = {
   organizationType: "Individual",
   name: "Sam",
   institution: "",
-  email: "sam.tutor@gmail.com",
+  email: "sam.lee@gmail.com",
   phone: "",
   message: "",
-  demoRequest: true,
-  sourceForm: "hero_details",
+  sourceForm: "contact_form",
   sourceUrl: "https://example.com",
 };

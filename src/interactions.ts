@@ -2,7 +2,8 @@ import { composeModal, leadCard as cardData, updateOriginal, verifyDiscordReques
 import { sendEmail } from "./email";
 import { getLead, saveLead, sha256Hex } from "./store";
 import { emailDrafts } from "./discord-templates";
-import type { Email, Env, Lead } from "./types";
+import type { Config } from "./config";
+import type { Email, Lead } from "./types";
 
 // https://discord.com/developers/docs/interactions/receiving-and-responding
 const PING = 1;
@@ -38,30 +39,30 @@ const ephemeral = (content: string) => Response.json({ type: REPLY, data: { cont
 const SEND_LOCK_MS = 2 * 60_000;
 
 /** Marks the lead as sending. Returns false if a Send is already in flight. */
-async function claimSend(env: Env, lead: Lead): Promise<boolean> {
+async function claimSend(config: Config, lead: Lead): Promise<boolean> {
   const now = Date.now();
   if (lead.sendingAt && now - lead.sendingAt < SEND_LOCK_MS) return false;
   lead.sendingAt = now;
-  await saveLead(env, lead);
+  await saveLead(config, lead);
   return true;
 }
 
 /** POST /discord: the Interactions Endpoint URL set in the Discord Developer Portal. */
-export async function handleInteraction(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-  const body = await verifyDiscordRequest(request, env.DISCORD_PUBLIC_KEY);
+export async function handleInteraction(request: Request, config: Config, ctx: ExecutionContext): Promise<Response> {
+  const body = await verifyDiscordRequest(request, config.DISCORD_PUBLIC_KEY);
   if (body === null) return new Response("Bad signature", { status: 401 });
   const interaction = JSON.parse(body) as Interaction;
   if (interaction.type === PING) return Response.json({ type: PONG });
 
   const user = interaction.member?.user ?? interaction.user;
-  const allowed = (env.ALLOWED_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const allowed = config.ALLOWED_USER_IDS;
   if (allowed.length && (!user || !allowed.includes(user.id))) {
-    return ephemeral("Only the Acme team can reply to leads.");
+    return ephemeral("Only allowed team members can reply to leads.");
   }
   const who = user?.global_name || user?.username || "someone";
 
   const [action, id] = (interaction.data?.custom_id ?? "").split(":");
-  const lead = id ? await getLead(env, id) : null;
+  const lead = id ? await getLead(config, id) : null;
   if (!lead) return ephemeral("This lead has expired, so it can't be emailed from here any more.");
 
   const open = lead.status === "review" || lead.status === "failed" || lead.status === "pending";
@@ -70,24 +71,24 @@ export async function handleInteraction(request: Request, env: Env, ctx: Executi
   if (interaction.type === COMPONENT) {
     switch (action) {
       case "edit":
-        if (!canWrite) return Response.json({ type: UPDATE, data: cardData(lead) });
+        if (!canWrite) return Response.json({ type: UPDATE, data: cardData(config, lead) });
         if (!lead.draft) {
-          lead.draft = (await emailDrafts(env, lead)).personal;
-          await saveLead(env, lead);
+          lead.draft = (await emailDrafts(config, lead)).personal;
+          await saveLead(config, lead);
         }
         return Response.json({ type: MODAL, data: composeModal(lead, lead.draft) });
       case "send":
-        if (!open || !lead.draft) return Response.json({ type: UPDATE, data: cardData(lead) });
-        if (!(await claimSend(env, lead))) return ephemeral("That email is already on its way.");
-        ctx.waitUntil(sendAndUpdate(env, interaction, lead, lead.draft, who));
+        if (!open || !lead.draft) return Response.json({ type: UPDATE, data: cardData(config, lead) });
+        if (!(await claimSend(config, lead))) return ephemeral("That email is already on its way.");
+        ctx.waitUntil(sendAndUpdate(config, interaction, lead, lead.draft, who));
         return Response.json({ type: DEFERRED_UPDATE });
       case "skip":
-        if (!open) return Response.json({ type: UPDATE, data: cardData(lead) });
+        if (!open) return Response.json({ type: UPDATE, data: cardData(config, lead) });
         lead.status = "skipped";
         lead.handledBy = who;
         lead.handledAt = Date.now();
-        await saveLead(env, lead);
-        return Response.json({ type: UPDATE, data: cardData(lead) });
+        await saveLead(config, lead);
+        return Response.json({ type: UPDATE, data: cardData(config, lead) });
     }
   }
 
@@ -101,19 +102,19 @@ export async function handleInteraction(request: Request, env: Env, ctx: Executi
       senderName: lead.draft?.senderName,
     };
     if (!email.subject || !email.body) return ephemeral("The subject and message can't be empty.");
-    if (!(await claimSend(env, lead))) return ephemeral("That email is already on its way.");
-    ctx.waitUntil(sendAndUpdate(env, interaction, lead, email, who));
+    if (!(await claimSend(config, lead))) return ephemeral("That email is already on its way.");
+    ctx.waitUntil(sendAndUpdate(config, interaction, lead, email, who));
     return Response.json({ type: DEFERRED_UPDATE });
   }
 
   return ephemeral("That button isn't recognised.");
 }
 
-async function sendAndUpdate(env: Env, interaction: Interaction, lead: Lead, email: Email, who: string): Promise<void> {
+async function sendAndUpdate(config: Config, interaction: Interaction, lead: Lead, email: Email, who: string): Promise<void> {
   try {
     // Same email = same key, so a double click sends once; an edited email sends fresh.
     const key = `${lead.id}-${(await sha256Hex(`${email.subject}\n${email.body}`)).slice(0, 16)}`;
-    await sendEmail(env, lead.email, email, key);
+    await sendEmail(config, lead.email, email, key);
     lead.status = "sent";
     lead.sentEmail = email;
     lead.handledBy = who;
@@ -125,9 +126,9 @@ async function sendAndUpdate(env: Env, interaction: Interaction, lead: Lead, ema
     lead.note = (err instanceof Error ? err.message : String(err)).slice(0, 300);
   }
   lead.sendingAt = undefined;
-  await saveLead(env, lead);
+  await saveLead(config, lead);
   try {
-    await updateOriginal(interaction.application_id, interaction.token, lead);
+    await updateOriginal(config, interaction.application_id, interaction.token, lead);
   } catch (err) {
     console.error(`[lead ${lead.id}] card update failed:`, err);
   }

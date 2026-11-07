@@ -14,15 +14,27 @@ binding = "LEADS"
 id = "REPLACE_WITH_KV_ID" # npm run setup fills this in
 
 [vars]
+# Your product or company name, used in the built-in emails ({{product_name}}).
+PRODUCT_NAME = "Example Co"
+# The name emails are signed with and sent from. A pinned SENDER_NAME message overrides it.
+SENDER_NAME = "Jordan"
 # Who emails come from.
 #   "gmail":  from GMAIL_USER (secret), shown as SENDER_NAME. Lands in that Gmail's Sent folder.
 #   "resend": from FROM_EMAIL, through Resend (needs RESEND_API_KEY and a verified domain).
 EMAIL_PROVIDER = "gmail"
-SENDER_NAME = "Alex"
-DISCORD_TEMPLATES_CHANNEL_ID = "REPLACE_WITH_TEMPLATES_CHANNEL_ID"
-FROM_EMAIL = "Alex from Acme <hello@example.com>"
-ALLOWED_ORIGINS = "https://example.com,https://www.example.com,https://example.org,https://www.example.org"
+FROM_EMAIL = "Jordan from Example Co <hello@example.com>"
+# The websites allowed to send leads, comma-separated.
+ALLOWED_ORIGINS = "https://example.com,https://www.example.com"
+# At most this many automatic emails a day. 0 turns auto-replies off.
 AUTO_SEND_DAILY_LIMIT = "40"
+# Leads scoring this or more go to Discord for review instead of an auto-reply.
+REVIEW_SCORE = "4"
+# organizationType values that always go to Discord for review, comma-separated.
+REVIEW_ORGANIZATION_TYPES = ""
+# How organizationType values are shown on cards, as JSON.
+ORGANIZATION_TYPE_LABELS = "{}"
+# A channel whose pinned messages override the email templates. Empty uses the built-in ones.
+DISCORD_TEMPLATES_CHANNEL_ID = ""
 
 [observability]
 enabled = true

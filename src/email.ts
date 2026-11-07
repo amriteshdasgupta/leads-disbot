@@ -1,4 +1,5 @@
-import type { Email, Env } from "./types";
+import type { Config } from "./config";
+import type { Email } from "./types";
 
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -13,8 +14,8 @@ export function toHtml(body: string): string {
 }
 
 /** The address emails come from, as people will see it. */
-export function fromAddress(env: Env): string {
-  return env.EMAIL_PROVIDER === "resend" ? env.FROM_EMAIL : `${env.SENDER_NAME} <${env.GMAIL_USER}>`;
+export function fromAddress(config: Config): string {
+  return config.EMAIL_PROVIDER === "resend" ? config.FROM_EMAIL ?? "" : `${config.SENDER_NAME} <${config.GMAIL_USER}>`;
 }
 
 /**
@@ -22,13 +23,13 @@ export function fromAddress(env: Env): string {
  * or "resend". The idempotency key only applies to Resend; Gmail double sends
  * are stopped before this is called (see claimSend in interactions.ts).
  */
-export async function sendEmail(env: Env, to: string, email: Email, idempotencyKey: string): Promise<void> {
-  if (env.EMAIL_PROVIDER === "resend") return sendWithResend(env, to, email, idempotencyKey);
-  return sendWithGmail(env, to, email);
+export async function sendEmail(config: Config, to: string, email: Email, idempotencyKey: string): Promise<void> {
+  if (config.EMAIL_PROVIDER === "resend") return sendWithResend(config, to, email, idempotencyKey);
+  return sendWithGmail(config, to, email);
 }
 
-async function sendWithGmail(env: Env, to: string, email: Email): Promise<void> {
-  if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) {
+async function sendWithGmail(config: Config, to: string, email: Email): Promise<void> {
+  if (!config.GMAIL_USER || !config.GMAIL_APP_PASSWORD) {
     throw new Error("Gmail isn't set up: GMAIL_USER and GMAIL_APP_PASSWORD are missing");
   }
   // Loaded here because it needs Cloudflare's TCP sockets, which only exist in a deployed worker.
@@ -38,13 +39,13 @@ async function sendWithGmail(env: Env, to: string, email: Email): Promise<void> 
       host: "smtp.gmail.com",
       port: 465,
       secure: true,
-      credentials: { username: env.GMAIL_USER, password: env.GMAIL_APP_PASSWORD.replace(/\s/g, "") },
+      credentials: { username: config.GMAIL_USER, password: config.GMAIL_APP_PASSWORD.replace(/\s/g, "") },
       authType: "plain",
     },
     {
-      from: { name: email.senderName ?? env.SENDER_NAME, email: env.GMAIL_USER },
+      from: { name: email.senderName ?? config.SENDER_NAME, email: config.GMAIL_USER },
       to: { email: to },
-      ...(env.REPLY_TO ? { reply: env.REPLY_TO } : {}),
+      ...(config.REPLY_TO ? { reply: config.REPLY_TO } : {}),
       subject: email.subject,
       text: email.body,
       html: toHtml(email.body),
@@ -52,21 +53,24 @@ async function sendWithGmail(env: Env, to: string, email: Email): Promise<void> 
   );
 }
 
-async function sendWithResend(env: Env, to: string, email: Email, idempotencyKey: string): Promise<void> {
+async function sendWithResend(config: Config, to: string, email: Email, idempotencyKey: string): Promise<void> {
+  if (!config.RESEND_API_KEY || !config.FROM_EMAIL) {
+    throw new Error("Resend isn't set up: RESEND_API_KEY and FROM_EMAIL are missing");
+  }
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      Authorization: `Bearer ${config.RESEND_API_KEY}`,
       "Content-Type": "application/json",
       "Idempotency-Key": idempotencyKey,
     },
     body: JSON.stringify({
-      from: env.FROM_EMAIL,
+      from: config.FROM_EMAIL,
       to: [to],
       subject: email.subject,
       text: email.body,
       html: toHtml(email.body),
-      ...(env.REPLY_TO ? { reply_to: env.REPLY_TO } : {}),
+      ...(config.REPLY_TO ? { reply_to: config.REPLY_TO } : {}),
     }),
   });
   if (!response.ok) {

@@ -1,24 +1,32 @@
+/**
+ * The worker's bindings as Cloudflare passes them: vars from wrangler.toml and
+ * secrets from `wrangler secret`. Read them through loadConfig() (config.ts),
+ * which validates them and fills in defaults.
+ */
 export interface Env {
   LEADS: KVNamespace;
 
+  // Vars (wrangler.toml)
+  PRODUCT_NAME?: string;
+  SENDER_NAME?: string;
+  EMAIL_PROVIDER?: string;
+  FROM_EMAIL?: string;
+  ALLOWED_ORIGINS?: string;
+  AUTO_SEND_DAILY_LIMIT?: string | number;
+  REVIEW_SCORE?: string | number;
+  REVIEW_ORGANIZATION_TYPES?: string;
+  ORGANIZATION_TYPE_LABELS?: string;
+  DISCORD_TEMPLATES_CHANNEL_ID?: string;
+
   // Secrets (wrangler secret bulk secrets.json)
-  DISCORD_BOT_TOKEN: string;
-  DISCORD_PUBLIC_KEY: string;
-  DISCORD_CHANNEL_ID: string;
+  DISCORD_BOT_TOKEN?: string;
+  DISCORD_PUBLIC_KEY?: string;
+  DISCORD_CHANNEL_ID?: string;
   GMAIL_USER?: string;
   GMAIL_APP_PASSWORD?: string;
   RESEND_API_KEY?: string;
   REPLY_TO?: string;
   ALLOWED_USER_IDS?: string;
-
-  // Vars (wrangler.toml)
-  /** "gmail" sends from GMAIL_USER; "resend" sends from FROM_EMAIL. */
-  EMAIL_PROVIDER: "gmail" | "resend";
-  FROM_EMAIL: string;
-  SENDER_NAME: string;
-  DISCORD_TEMPLATES_CHANNEL_ID?: string;
-  ALLOWED_ORIGINS: string;
-  AUTO_SEND_DAILY_LIMIT: string;
 }
 
 export interface Email {
@@ -34,13 +42,14 @@ export interface Submission {
   email: string;
   capturedEmail?: string;
   name?: string;
+  /** The organization or company name. Called "institution" on the wire for older forms. */
   institution?: string;
   organizationType?: string;
   phone?: string;
   message?: string;
   sourceForm?: string;
   sourceUrl?: string;
-  /** The four-step details dialog was finished (not the hero email box, not a half-filled close). */
+  /** The full form was sent (not just an email-capture box or a half-filled form). */
   complete: boolean;
 }
 
