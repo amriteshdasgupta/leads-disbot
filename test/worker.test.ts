@@ -67,7 +67,7 @@ describe("HTTP", () => {
     const t = setup();
     const res = await run(new Request("https://leads.example/"), t.env, t.ctx);
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("lead-responder is running\n");
+    expect(await res.text()).toBe("leads-disbot is running\n");
     expect((await run(new Request("https://leads.example/nope"), t.env, t.ctx)).status).toBe(404);
   });
 

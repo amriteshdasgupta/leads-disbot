@@ -78,7 +78,7 @@ export function loadConfig(env: Env): Config {
   const result = schema.safeParse(env);
   if (!result.success) {
     const problems = result.error.issues.map((issue) => `- ${issue.path.join(".")} ${issue.message}`);
-    throw new ConfigError(`lead-responder isn't configured correctly:\n${problems.join("\n")}`);
+    throw new ConfigError(`leads-disbot isn't configured correctly:\n${problems.join("\n")}`);
   }
   return result.data;
 }

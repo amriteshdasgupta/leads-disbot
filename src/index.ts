@@ -15,7 +15,7 @@ app.use(async (c, next) => {
   await next();
 });
 
-app.get("/", (c) => c.text("lead-responder is running\n"));
+app.get("/", (c) => c.text("leads-disbot is running\n"));
 
 app.on(
   ["POST", "OPTIONS"],
@@ -40,7 +40,7 @@ app.notFound((c) => c.text("Not found", 404));
 app.onError((err, c) => {
   console.error(err);
   if (err instanceof ConfigError) {
-    return c.text("lead-responder is misconfigured. Run `npx wrangler tail` to see why.\n", 500);
+    return c.text("leads-disbot is misconfigured. Run `npx wrangler tail` to see why.\n", 500);
   }
   return c.text("Internal error", 500);
 });

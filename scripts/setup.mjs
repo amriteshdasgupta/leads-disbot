@@ -1,7 +1,14 @@
-// Creates the KV namespace the worker stores leads in and writes its id into
-// wrangler.toml. Run once, after `npx wrangler login`.
+// Creates wrangler.toml from wrangler.example.toml, then the KV namespace the
+// worker stores leads in, and writes its id into wrangler.toml. Run once,
+// after `npx wrangler login`. wrangler.toml is gitignored, so your account's
+// IDs never end up in git.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+
+if (!existsSync("wrangler.toml")) {
+  copyFileSync("wrangler.example.toml", "wrangler.toml");
+  console.log("Created wrangler.toml from wrangler.example.toml.");
+}
 
 const toml = readFileSync("wrangler.toml", "utf8");
 if (!toml.includes("REPLACE_WITH_KV_ID")) {
@@ -18,4 +25,5 @@ if (!id) {
 }
 
 writeFileSync("wrangler.toml", toml.replace("REPLACE_WITH_KV_ID", id));
-console.log(`KV namespace ${id} written to wrangler.toml. Commit that change.`);
+console.log(`KV namespace ${id} written to wrangler.toml.`);
+console.log("Next: set the [vars] in wrangler.toml for your business (see the README).");

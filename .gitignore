@@ -2,3 +2,5 @@ node_modules/
 .wrangler/
 .dev.vars
 secrets.json
+# Your copy of wrangler.example.toml, with your account's IDs (npm run setup creates it).
+wrangler.toml

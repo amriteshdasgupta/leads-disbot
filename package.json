@@ -1,7 +1,31 @@
 {
-  "name": "lead-responder",
+  "name": "leads-disbot",
   "version": "1.0.0",
-  "description": "Replies to Acme website leads: auto-emails small ones, sends the rest to Discord to approve.",
+  "description": "A self-hosted Discord bot on Cloudflare Workers that triages website leads: auto-replies to small ones and posts the rest as cards with Send / Edit / Skip buttons.",
+  "keywords": [
+    "discord",
+    "discord-bot",
+    "cloudflare-workers",
+    "leads",
+    "lead-management",
+    "contact-form",
+    "auto-reply",
+    "gmail",
+    "resend",
+    "hono"
+  ],
+  "homepage": "https://github.com/amriteshdasgupta/leads-disbot#readme",
+  "bugs": {
+    "url": "https://github.com/amriteshdasgupta/leads-disbot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amriteshdasgupta/leads-disbot.git"
+  },
+  "license": "MIT",
+  "author": "Amritesh Dasgupta",
+  "private": true,
+  "type": "module",
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "wrangler dev",
@@ -9,21 +33,19 @@
     "test": "vitest run",
     "typecheck": "tsc"
   },
-  "type": "module",
+  "dependencies": {
+    "hono": "^4.13.17",
+    "worker-mailer": "^1.3.1",
+    "zod": "^4.6.7"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261104.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0",
     "wrangler": "^4.157.0"
   },
-  "private": true,
   "allowScripts": {
     "workerd@1.20261103.1": true,
     "esbuild@0.28.2": true
-  },
-  "dependencies": {
-    "hono": "^4.13.17",
-    "worker-mailer": "^1.3.1",
-    "zod": "^4.6.7"
   }
 }
