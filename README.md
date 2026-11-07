@@ -9,9 +9,24 @@ Every lead becomes a card in a Discord channel. Small leads get a friendly autom
 
 It runs on Cloudflare Workers (the free plan is enough), stores leads in Workers KV, and sends email from your own Gmail or through [Resend](https://resend.com). Nothing else to host.
 
+<p align="center">
+  <img src="docs/images/card-needs-reply.png" width="640" alt="A lead card in Discord: Priya Raman from Northgate Logistics needs a reply. The card shows a drafted email, the lead's type, email, phone and message, a score of 8 with the reasons, and Send, Edit and Skip buttons.">
+</p>
+
 ## What you see in Discord
 
 Each lead is one card. Its colour and buttons follow what has happened to it:
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/card-auto-replied.png" alt="A blue card for Sam Lee: auto-replied 24 minutes ago, showing the automatic email that was sent and a Write follow-up button."></td>
+    <td width="50%"><img src="docs/images/card-sent.png" alt="A green card for Marta Silva from Studio Nine: sent by Robin 2 hours ago, showing the email that went out."></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>A small lead got the automatic email</sub></td>
+    <td align="center"><sub>A teammate pressed <b>Send</b></sub></td>
+  </tr>
+</table>
 
 | Card | Meaning | Buttons |
 | --- | --- | --- |
@@ -27,6 +42,8 @@ Each lead is one card. Its colour and buttons follow what has happened to it:
 - **Write follow-up** writes a personal email on top of the automatic one.
 
 Cards also show the lead's details (type, email, phone, message) and how they were scored. The bot uses buttons rather than emoji reactions because buttons work through Discord's interactions webhook, so nothing has to stay connected to Discord.
+
+<sub>The images above are the bot's real card output for example leads (`PRODUCT_NAME = "Brightdesk"`, `REVIEW_ORGANIZATION_TYPES = "Company,Agency"`), drawn in Discord's dark theme.</sub>
 
 ## How it works
 
@@ -282,7 +299,7 @@ Without any setup, the bot uses the built-in emails in [`src/templates.ts`](src/
 | `{{greeting}}` | "Hi Sam," or "Hi there," |
 | `{{on_behalf_of}}` | " on behalf of Northgate", or nothing |
 | `{{institution_suffix}}` | " for Northgate", or nothing |
-| `{{org_possessive}}` | "Northgate's", or "your" |
+| `{{org_possessive}}` | "Northgate's" (or "Northgate Logistics'"), or "your" |
 | `{{note_acknowledgement}}` | A short paragraph thanking them for their message, only when they wrote one |
 | `{{paper_owner}}` | Deprecated alias of `{{org_possessive}}`, still accepted |
 
